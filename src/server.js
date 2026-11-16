@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import { UPLOAD_DIR } from "./paths.js";
 import { ensureSeed } from "./db.js";
+import { scheduleCleanup } from "./cleanup.js";
 import authRoutes from "./routes/auth.js";
 import videoRoutes from "./routes/videos.js";
 import feedbackRoutes from "./routes/feedback.js";
@@ -18,11 +19,21 @@ app.set("trust proxy", 1); // behind Nginx: real client IP for rate limiting
 app.use(cors({ origin: origins }));
 app.use(express.json({ limit: "400kb" }));
 
-// Uploaded images / videos (served with range support so videos can seek)
+// Public data is always revalidated (cheap 304 when unchanged), so admin edits show up
+// without anyone clearing their cache.
+app.use(["/content", "/videos", "/feedback/approved"], (req, res, next) => {
+  if (req.method === "GET") res.setHeader("Cache-Control", "no-cache");
+  next();
+});
+
+// Uploaded images / videos (served with range support so videos can seek).
+// Every upload gets a unique random file name, so a replaced image has a NEW url and is never
+// stale; old names can be cached for a year safely.
 app.use(
   "/uploads",
   express.static(UPLOAD_DIR, {
-    maxAge: "7d",
+    maxAge: "365d",
+    immutable: true,
     setHeaders: (res) => {
       res.setHeader("Cross-Origin-Resource-Policy", "cross-origin");
       res.setHeader("X-Content-Type-Options", "nosniff");
@@ -47,4 +58,5 @@ app.use((err, _req, res, _next) => {
 
 const port = Number(process.env.PORT || 5006);
 await ensureSeed();
+scheduleCleanup();
 app.listen(port, () => console.log(`Elipse Kids API running on port ${port}`));

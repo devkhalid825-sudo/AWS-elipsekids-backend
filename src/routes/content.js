@@ -6,7 +6,7 @@ const r = Router();
 
 // Editable sections of the website. The frontend ships defaults for each one;
 // what is stored here are the overrides saved from the admin panel.
-export const SECTIONS = ["site", "hero", "bond", "whatsNew", "about", "partner", "pages"];
+export const SECTIONS = ["site", "hero", "footer", "shorts", "reviews", "bond", "whatsNew", "about", "partner", "pages"];
 
 r.get("/", ah(async (_req, res) => {
   const rows = await prisma.content.findMany({ where: { key: { in: SECTIONS } } });
@@ -20,7 +20,12 @@ r.put("/:key", requireAdmin, ah(async (req, res) => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return res.status(400).json({ detail: "Body must be a JSON object" });
   }
-  if (JSON.stringify(value).length > 300_000) return res.status(413).json({ detail: "Content too large" });
+  const json = JSON.stringify(value);
+  // Images/videos must be uploaded (POST /upload) and referenced by URL, never embedded in the database.
+  if (/data:(?:image|video|application)[/]/i.test(json)) {
+    return res.status(400).json({ detail: "Embedded files are not allowed. Upload the image and use its URL." });
+  }
+  if (json.length > 300_000) return res.status(413).json({ detail: "Content too large" });
   await prisma.content.upsert({ where: { key }, update: { value }, create: { key, value } });
   res.json(value);
 }));
