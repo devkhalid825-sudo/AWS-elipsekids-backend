@@ -1,0 +1,66 @@
+// Prisma schema for elipse_kids_db (MySQL)
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// Editable website sections (site, hero, bond, whatsNew, about, partner, pages).
+// `value` holds the JSON the admin panel saved; the frontend merges it over its defaults.
+model Content {
+  key       String   @id @db.VarChar(64)
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+// Videos shown in "Popular Videos": a YouTube link or an uploaded file.
+model Video {
+  id        String   @id @default(uuid())
+  title     String   @db.VarChar(200)
+  source    String   @db.VarChar(16) // "youtube" | "upload"
+  youtubeId String?  @db.VarChar(16)
+  fileUrl   String?  @db.VarChar(255)
+  thumbUrl  String?  @db.VarChar(255)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Parent reviews / testimonials, moderated from the admin panel.
+model Feedback {
+  id        String   @id @default(uuid())
+  text      String   @db.Text
+  author    String?  @db.VarChar(80)
+  childAge  String?  @db.VarChar(20)
+  rating    Int      @default(5)
+  status    String   @default("pending") @db.VarChar(16) // pending | approved | rejected
+  createdAt DateTime @default(now())
+
+  @@index([status, createdAt])
+}
+
+// Partner form submissions from /partner.
+model Inquiry {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(120)
+  company   String   @db.VarChar(160)
+  email     String   @db.VarChar(200)
+  category  String   @db.VarChar(120)
+  message   String   @db.Text
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// Admin accounts. The panel currently logs in with ADMIN_NAME / ADMIN_PASSWORD from .env;
+// this table is ready if you want per-person logins later (store a bcrypt hash, never plain text).
+model AdminUser {
+  id           String   @id @default(uuid())
+  name         String   @unique @db.VarChar(80)
+  passwordHash String   @db.VarChar(255)
+  createdAt    DateTime @default(now())
+}
